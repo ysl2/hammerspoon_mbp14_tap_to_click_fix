@@ -16,7 +16,7 @@ local cmdtapTimer = nil
 local isTapFixing = false
 local isTapAfterFlagsPress = false
 
-function flagsListener(e)
+local function flagsListener(e)
 	isFlagsPress = false
 	pressedFlag = nil
 	stationaryCount = 0
@@ -39,17 +39,14 @@ function flagsListener(e)
 	end
 end
 
-tapFlags = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, flagsListener)
-tapFlags:start()
-
-function resetTimer()
+local function resetTimer()
 	if cmdtapTimer ~= nil then
 		cmdtapTimer:stop()
 		cmdtapTimer = nil
 	end
 end
 
-function tapListener(e)
+local function tapListener(e)
 	if isFlagsPress == false then
 		trackpadEventCount = 0
 		stationaryCount = 0
@@ -108,11 +105,14 @@ function tapListener(e)
 	end
 end
 
-tapGesture = hs.eventtap.new({ hs.eventtap.event.types.gesture }, tapListener)
+local tapFlags = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, flagsListener)
+tapFlags:start()
+
+local tapGesture = hs.eventtap.new({ hs.eventtap.event.types.gesture }, tapListener)
 tapGesture:start()
 
 -- 正常触发时清空数据，避免程序触发
-tapMouseDown = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(e)
+local tapMouseDown = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(e)
 	-- print("mouse down")
 	trackpadEventCount = 0
 	stationaryCount = 0
