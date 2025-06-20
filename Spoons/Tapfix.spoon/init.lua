@@ -105,19 +105,21 @@ local function tapListener(e)
 	end
 end
 
-local tapFlags = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, flagsListener)
-tapFlags:start()
+function obj:init()
+	local tapFlags = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, flagsListener)
+	tapFlags:start()
 
-local tapGesture = hs.eventtap.new({ hs.eventtap.event.types.gesture }, tapListener)
-tapGesture:start()
+	local tapGesture = hs.eventtap.new({ hs.eventtap.event.types.gesture }, tapListener)
+	tapGesture:start()
 
--- 正常触发时清空数据，避免程序触发
-local tapMouseDown = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(e)
-	-- print("mouse down")
-	trackpadEventCount = 0
-	stationaryCount = 0
-	resetTimer()
-end)
-tapMouseDown:start()
+	-- 正常触发时清空数据，避免程序触发
+	local tapMouseDown = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(e)
+		-- print("mouse down")
+		trackpadEventCount = 0
+		stationaryCount = 0
+		resetTimer()
+	end)
+	tapMouseDown:start()
+end
 
 return obj
