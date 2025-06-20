@@ -1,125 +1,71 @@
+-- hs.console.clearConsole()
 local obj = {}
 obj.__index = obj
 
--- Metadata
-obj.name = "Tapfix for mbp 14"
-obj.version = "1.0"
-obj.author = "lcomplete"
-obj.homepage = "https://github.com/lcomplete/hammerspoon_mbp14_tap_to_click_fix"
-obj.license = "MIT - https://opensource.org/licenses/MIT"
-
-local isFlagsPress = false
-local pressedFlag = nil
-local stationaryCount = 0 -- 触摸板上静止不动的事件数量
-local trackpadEventCount = 0 -- 触摸板上发生的事件数量
-local cmdtapTimer = nil
-local isTapFixing = false
-local isTapAfterFlagsPress = false
-
-local function flagsListener(e)
-	isFlagsPress = false
-	pressedFlag = nil
-	stationaryCount = 0
-	trackpadEventCount = 0
-	local flags = e:getFlags()
-	if flags.cmd and not (flags.alt or flags.shift or flags.ctrl or flags.fn) then
-		local keyCode = e:getKeyCode()
-		if keyCode == 0x37 then
-			-- print("~~ left cmd key")
-			isFlagsPress = true
-			pressedFlag = "cmd"
-		end
-	elseif flags.shift and not (flags.alt or flags.cmd or flags.ctrl or flags.fn) then
-		local keyCode = e:getKeyCode()
-		if keyCode == 0x38 then
-			-- print("~~ left shift key")
-			isFlagsPress = true
-			pressedFlag = "shift"
-		end
-	end
-end
-
-local function resetTimer()
-	if cmdtapTimer ~= nil then
-		cmdtapTimer:stop()
-		cmdtapTimer = nil
-	end
-end
-
-local function tapListener(e)
-	if isFlagsPress == false then
-		trackpadEventCount = 0
-		stationaryCount = 0
-		isTapAfterFlagsPress = false
-		return
-	end
-
-	local touches = e:getTouches()
-	-- print(dump(touches))
-	local touch = nil
-	if touches ~= nil then
-		touch = touches[1]
-	end
-	if touch == nil then
-		return
-	end
-
-	if touch.phase == "stationary" then
-		-- print(touch.phase)
-		trackpadEventCount = trackpadEventCount + 1
-		stationaryCount = stationaryCount + 1
-	elseif touch.phase == "began" then
-		stationaryCount = 0
-		trackpadEventCount = 0
-		isTapAfterFlagsPress = true
-	elseif touch.phase == "ended" then
-		-- print("trackpadEventCount: " .. trackpadEventCount)
-		-- 一次 tap to click 总的事件一般不会超过 10 个，其中静止事件一般大于 2 个，按住 cmd 时，可能小于 2 个
-		if
-			isFlagsPress
-			and isTapAfterFlagsPress
-			and isTapFixing == false
-			and trackpadEventCount < 10
-			and stationaryCount >= 1
-		then
-			-- print('tap to click fixing')
-			resetTimer()
-			cmdtapTimer = hs.timer.doAfter(0.1, function()
-				-- print('timer complete')
-				local pos = hs.mouse.absolutePosition()
-				hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos, { pressedFlag }):post()
-				hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos, { pressedFlag }):post()
-			end)
-
-			isTapAfterFlagsPress = false
-			-- 控制间隔时间 避免重复触发
-			isTapFixing = true
-			hs.timer.doAfter(0.35, function()
-				isTapFixing = false
-			end)
-		end
-		stationaryCount = 0
-		trackpadEventCount = 0
-	else
-		trackpadEventCount = trackpadEventCount + 1
-	end
-end
+local windowFlags = nil
 
 function obj:init()
-	local tapFlags = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, flagsListener)
-	tapFlags:start()
+	hs
+		.eventtap
+		-- .new({ hs.eventtap.event.types.gesture }, function(e)
+		.new({ "all" }, function(e)
+      local eventType = e:getType()
+			local touches = e:getTouches()
+			local flags = {}
+			for key, value in pairs(e:getFlags()) do
+				if value then
+					table.insert(flags, key)
+				end
+			end
 
-	local tapGesture = hs.eventtap.new({ hs.eventtap.event.types.gesture }, tapListener)
-	tapGesture:start()
+			-- if #flags > 0 and touches ~= nil and #touches == 1 and touches[1].phase == "ended" then
+			-- 	local absolutePosition = hs.mouse.absolutePosition()
+			-- 	hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, absolutePosition, flags):post()
+			-- 	hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, absolutePosition, flags):post()
+			-- end
 
-	-- 正常触发时清空数据，避免程序触发
-	local tapMouseDown = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(e)
-		-- print("mouse down")
-		trackpadEventCount = 0
-		stationaryCount = 0
-		resetTimer()
-	end)
-	tapMouseDown:start()
+			-- -- NOTE: logs
+			if touches ~= nil and #touches > 0 and touches[1].phase ~= "moved" then
+				print("gesture" .. " - " .. touches[1].phase)
+			elseif
+				hs.eventtap.event.types[eventType] == "gesture"
+				or hs.eventtap.event.types[eventType] == "mouseMoved"
+				or hs.eventtap.event.types[eventType] == "keyUp"
+				or hs.eventtap.event.types[eventType] == "keyDown"
+			then
+			else
+				print(hs.eventtap.event.types[eventType])
+			end
+
+			if #flags > 0 and (touches ~= nil and #touches == 1 and touches[1].phase == "ended") then
+				windowFlags = flags
+				-- local log = "windowFlags: "
+				-- for i, f in ipairs(windowFlags) do
+				-- 	log = log .. f .. ", "
+				-- end
+				-- print(log)
+				return
+			end
+			if windowFlags and (eventType == hs.eventtap.event.types.leftMouseDown) then
+				windowFlags = nil
+				-- print("windowFlags: nil (leftMouseDown)")
+				return
+			end
+			if windowFlags and (eventType == hs.eventtap.event.types.flagsChanged and #flags == 0) then
+				local absolutePosition = hs.mouse.absolutePosition()
+				hs.eventtap.event
+					.newMouseEvent(hs.eventtap.event.types.leftMouseDown, absolutePosition, windowFlags)
+					:post()
+				hs.eventtap.event
+					.newMouseEvent(hs.eventtap.event.types.leftMouseUp, absolutePosition, windowFlags)
+					:post()
+				windowFlags = nil
+				-- print("inject now!!!")
+				-- print("windowFlags: nil (inject)")
+				return
+			end
+		end)
+		:start()
 end
 
 return obj
